@@ -1,4 +1,4 @@
-# Consul Lab
+# Consul Lab v1.0.0
 
 A CLI tool for deploying production-like Consul clusters on Kubernetes with service mesh, monitoring, and security.
 
@@ -97,6 +97,7 @@ After making changes, validate your configuration:
 
 ```bash
 ./consul-lab help           # Show all available commands
+./consul-lab version        # Show version information
 ./consul-lab deploy         # Deploy complete Consul cluster
 ./consul-lab status         # Check deployment status
 ./consul-lab logs           # View Consul logs
