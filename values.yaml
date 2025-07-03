@@ -1,0 +1,48 @@
+## Settings under "global" pertain all to all components of Consul installation.
+global:
+  # The name of your installation. Should always be set to consul.
+  name: consul
+  # Enable metrics so we can observe what's going on our installation.
+  metrics:
+    enabled: true
+  # Enable ACLs for security
+  acls:
+    manageSystemACLs: true
+  # Consul image - using latest stable version
+  image: hashicorp/consul:1.21.2
+  # Envoy image - using latest compatible version with Consul 1.21.2
+  imageEnvoy: envoyproxy/envoy:v1.33.3
+# Settings under "server" configure Consul servers.
+server:
+  # replicas sets the number of Consul servers to run.
+  # In prod, this should be 3 or 5.
+  # For testing, 1 is enough unless you are testing a DC voting scenario.
+  replicas: 1
+# Settings under "controller" configure the Consul controller that manages custom resources.
+controller:
+  enabled: true
+# Settings under "connectInject" configure the automatic Connect sidecar injector.
+connectInject:
+  # Enable Consul's service mesh capabilities.
+  enabled: true
+# Install Prometheus for metrics collection.
+prometheus:
+  enabled: true
+# Settings under "ui" configure the Consul UI.
+ui:
+  service:
+    # Use ClusterIP for ingress access
+    type: ClusterIP
+    # Set the port to 80, which will forward to Consul UI on port 8500.
+    port:
+      http: 80
+  # Configure ingress for local cluster access
+  ingress:
+    enabled: true
+    ingressClassName: "nginx" # Common for local clusters
+    hosts:
+      - host: consul.local
+        paths:
+          - /
+    annotations: |
+      nginx.ingress.kubernetes.io/use-regex: "true"
