@@ -110,7 +110,15 @@ main() {
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             print_status "Uninstalling existing Consul deployment..."
             consul-k8s uninstall --auto-approve
-            print_success "Existing deployment uninstalled"
+            
+            # Clean up any remaining PVCs
+            print_status "Cleaning up persistent volume claims..."
+            kubectl delete pvc -n consul -l app=consul --ignore-not-found=true
+            
+            # Wait a moment for cleanup to complete
+            sleep 2
+            
+            print_success "Existing deployment uninstalled and cleaned up"
         else
             print_error "Deployment aborted"
             exit 1
