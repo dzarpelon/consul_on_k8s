@@ -129,6 +129,7 @@ main() {
     # Check if values.yaml exists
     if [ ! -f "values.yaml" ]; then
         print_error "values.yaml file not found in current directory"
+        print_info "Make sure you're running this from the config directory or via the main deploy.sh script"
         exit 1
     fi
     
@@ -145,12 +146,12 @@ main() {
     echo
     
     # Apply Prometheus ingress if file exists
-    if [ -f "prometheus-ingress.yaml" ]; then
+    if [ -f "../manifests/prometheus-ingress.yaml" ]; then
         print_status "Applying Prometheus ingress..."
-        kubectl apply -f prometheus-ingress.yaml
+        kubectl apply -f "../manifests/prometheus-ingress.yaml"
         print_success "Prometheus ingress applied"
     else
-        print_warning "prometheus-ingress.yaml not found, skipping Prometheus ingress setup"
+        print_warning "prometheus-ingress.yaml not found in manifests directory, skipping Prometheus ingress setup"
     fi
     echo
     

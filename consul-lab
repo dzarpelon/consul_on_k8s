@@ -1,0 +1,363 @@
+#!/bin/bash
+
+# Consul Lab CLI - A CLI tool for managing Consul on Kubernetes lab environments
+# Usage: ./consul-lab <command> [options]
+
+set -e
+
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DIR="$SCRIPT_DIR/config"
+SCRIPTS_DIR="$SCRIPT_DIR/scripts"
+MANIFESTS_DIR="$SCRIPT_DIR/manifests"
+
+# Version
+VERSION="1.0.0"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Print functions
+print_status() {
+    echo -e "${BLUE}==> ${1}${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}✓ ${1}${NC}"
+}
+
+print_error() {
+    echo -e "${RED}✗ ${1}${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠ ${1}${NC}"
+}
+
+print_info() {
+    echo -e "${CYAN}ℹ ${1}${NC}"
+}
+
+print_header() {
+    echo -e "${PURPLE}${1}${NC}"
+}
+
+# Help function
+show_help() {
+    print_header "Consul Lab CLI v${VERSION}"
+    echo ""
+    echo "A CLI tool for managing production-like Consul deployments on Kubernetes"
+    echo ""
+    echo "Usage:"
+    echo "  ./consul-lab <command> [options]"
+    echo ""
+    echo "Commands:"
+    echo "  deploy          Deploy Consul cluster with all components"
+    echo "  cleanup         Remove Consul deployment and all resources"
+    echo "  status          Check status of Consul deployment"
+    echo "  logs            View Consul server logs"
+    echo "  token           Get the bootstrap ACL token"
+    echo "  ui              Open Consul UI in browser"
+    echo "  prometheus      Open Prometheus UI in browser"
+    echo "  setup-hosts     Add required entries to /etc/hosts"
+    echo "  port-forward    Port forward services to localhost"
+    echo "  test            Run basic connectivity tests"
+    echo "  validate        Validate configuration files"
+    echo "  upgrade         Upgrade Consul deployment"
+    echo "  version         Show version information"
+    echo "  help            Show this help message"
+    echo ""
+    echo "Options:"
+    echo "  --auto          Skip confirmation prompts (for cleanup)"
+    echo "  --auto-hosts    Automatically manage /etc/hosts entries"
+    echo "  --verbose       Enable verbose output"
+    echo ""
+    echo "Examples:"
+    echo "  ./consul-lab deploy                    # Deploy Consul cluster"
+    echo "  ./consul-lab cleanup --auto            # Cleanup without prompts"
+    echo "  ./consul-lab status                    # Check deployment status"
+    echo "  ./consul-lab port-forward ui           # Port forward Consul UI"
+    echo ""
+}
+
+# Check dependencies
+check_deps() {
+    local missing_deps=()
+    
+    if ! command -v kubectl >/dev/null 2>&1; then
+        missing_deps+=("kubectl")
+    fi
+    
+    if ! command -v consul-k8s >/dev/null 2>&1; then
+        missing_deps+=("consul-k8s")
+    fi
+    
+    if [ ${#missing_deps[@]} -ne 0 ]; then
+        print_error "Missing required dependencies: ${missing_deps[*]}"
+        echo ""
+        echo "Install missing dependencies:"
+        for dep in "${missing_deps[@]}"; do
+            case $dep in
+                kubectl)
+                    echo "  kubectl: brew install kubectl"
+                    ;;
+                consul-k8s)
+                    echo "  consul-k8s: brew install hashicorp/tap/consul-k8s"
+                    ;;
+            esac
+        done
+        exit 1
+    fi
+    
+    # Check Kubernetes connection
+    if ! kubectl cluster-info >/dev/null 2>&1; then
+        print_error "Cannot connect to Kubernetes cluster"
+        exit 1
+    fi
+}
+
+# Deploy command
+cmd_deploy() {
+    print_header "Deploying Consul Lab Environment"
+    check_deps
+    
+    if [ ! -f "$CONFIG_DIR/values.yaml" ]; then
+        print_error "Configuration file not found: $CONFIG_DIR/values.yaml"
+        exit 1
+    fi
+    
+    if [ ! -f "$SCRIPTS_DIR/deploy-consul.sh" ]; then
+        print_error "Deployment script not found: $SCRIPTS_DIR/deploy-consul.sh"
+        exit 1
+    fi
+    
+    cd "$CONFIG_DIR"
+    "$SCRIPTS_DIR/deploy-consul.sh"
+}
+
+# Cleanup command
+cmd_cleanup() {
+    print_header "Cleaning up Consul Lab Environment"
+    
+    if [ ! -f "$SCRIPTS_DIR/cleanup-consul.sh" ]; then
+        print_error "Cleanup script not found: $SCRIPTS_DIR/cleanup-consul.sh"
+        exit 1
+    fi
+    
+    "$SCRIPTS_DIR/cleanup-consul.sh" "$@"
+}
+
+# Status command
+cmd_status() {
+    print_header "Consul Lab Status"
+    
+    echo "Consul Pods:"
+    kubectl get pods -n consul -o wide 2>/dev/null || print_warning "No Consul deployment found"
+    echo ""
+    echo "Consul Services:"
+    kubectl get svc -n consul 2>/dev/null || print_warning "No Consul services found"
+    echo ""
+    echo "Consul Ingresses:"
+    kubectl get ingress -n consul 2>/dev/null || print_warning "No Consul ingresses found"
+}
+
+# Logs command
+cmd_logs() {
+    print_header "Consul Server Logs"
+    kubectl logs -n consul -l app=consul --tail=50 -f 2>/dev/null || print_error "No Consul pods found"
+}
+
+# Token command
+cmd_token() {
+    print_header "Bootstrap ACL Token"
+    token=$(kubectl get secret consul-bootstrap-acl-token -n consul -o jsonpath='{.data.token}' 2>/dev/null | base64 -d) || {
+        print_error "Bootstrap token not found"
+        exit 1
+    }
+    echo "Bootstrap Token: $token"
+}
+
+# UI command
+cmd_ui() {
+    print_header "Opening Consul UI"
+    if command -v open >/dev/null 2>&1; then
+        open http://consul.local 2>/dev/null || print_error "Could not open browser. Ensure /etc/hosts is configured"
+    else
+        print_info "Consul UI available at: http://consul.local"
+        print_info "Ensure /etc/hosts contains: 127.0.0.1 consul.local"
+    fi
+}
+
+# Prometheus command
+cmd_prometheus() {
+    print_header "Opening Prometheus UI"
+    if command -v open >/dev/null 2>&1; then
+        open http://prometheus.local 2>/dev/null || print_error "Could not open browser. Ensure /etc/hosts is configured"
+    else
+        print_info "Prometheus UI available at: http://prometheus.local"
+        print_info "Ensure /etc/hosts contains: 127.0.0.1 prometheus.local"
+    fi
+}
+
+# Setup hosts command
+cmd_setup_hosts() {
+    print_header "Setting up /etc/hosts"
+    
+    if [ ! -f "$SCRIPTS_DIR/setup-hosts.sh" ]; then
+        print_error "Setup hosts script not found: $SCRIPTS_DIR/setup-hosts.sh"
+        exit 1
+    fi
+    
+    "$SCRIPTS_DIR/setup-hosts.sh"
+}
+
+# Port forward command
+cmd_port_forward() {
+    local service="$1"
+    
+    case "$service" in
+        ui|consul)
+            print_header "Port forwarding Consul UI to http://localhost:8500"
+            kubectl port-forward -n consul svc/consul-ui 8500:80
+            ;;
+        prometheus)
+            print_header "Port forwarding Prometheus to http://localhost:9090"
+            kubectl port-forward -n consul svc/prometheus-server 9090:80
+            ;;
+        *)
+            print_error "Unknown service: $service"
+            print_info "Available services: ui, consul, prometheus"
+            exit 1
+            ;;
+    esac
+}
+
+# Test command
+cmd_test() {
+    print_header "Testing Consul Lab Environment"
+    
+    print_status "Testing cluster connectivity..."
+    kubectl exec -n consul consul-server-0 -- consul members 2>/dev/null || print_error "Failed to get cluster members"
+    
+    print_status "Testing service catalog..."
+    kubectl exec -n consul consul-server-0 -- consul catalog services 2>/dev/null || print_error "Failed to get service catalog"
+    
+    print_success "Tests completed"
+}
+
+# Validate command
+cmd_validate() {
+    print_header "Validating Configuration"
+    
+    local errors=0
+    
+    if [ -f "$CONFIG_DIR/values.yaml" ]; then
+        print_success "values.yaml exists"
+    else
+        print_error "values.yaml missing"
+        ((errors++))
+    fi
+    
+    if [ -f "$MANIFESTS_DIR/prometheus-ingress.yaml" ]; then
+        print_success "prometheus-ingress.yaml exists"
+    else
+        print_error "prometheus-ingress.yaml missing"
+        ((errors++))
+    fi
+    
+    if [ -f "$SCRIPTS_DIR/deploy-consul.sh" ]; then
+        print_success "deploy script exists"
+    else
+        print_error "deploy script missing"
+        ((errors++))
+    fi
+    
+    if [ $errors -eq 0 ]; then
+        print_success "All configuration files are valid"
+    else
+        print_error "Found $errors configuration issues"
+        exit 1
+    fi
+}
+
+# Upgrade command
+cmd_upgrade() {
+    print_header "Upgrading Consul Deployment"
+    
+    cd "$CONFIG_DIR"
+    consul-k8s upgrade -config-file=values.yaml
+}
+
+# Version command
+cmd_version() {
+    echo "Consul Lab CLI v${VERSION}"
+    echo ""
+    echo "Dependencies:"
+    kubectl version --client 2>/dev/null | head -n1 || echo "kubectl: not installed"
+    consul-k8s version 2>/dev/null || echo "consul-k8s: not installed"
+}
+
+# Main function
+main() {
+    local command="$1"
+    shift || true
+    
+    case "$command" in
+        deploy|install)
+            cmd_deploy "$@"
+            ;;
+        cleanup|clean)
+            cmd_cleanup "$@"
+            ;;
+        status)
+            cmd_status "$@"
+            ;;
+        logs)
+            cmd_logs "$@"
+            ;;
+        token)
+            cmd_token "$@"
+            ;;
+        ui)
+            cmd_ui "$@"
+            ;;
+        prometheus)
+            cmd_prometheus "$@"
+            ;;
+        setup-hosts)
+            cmd_setup_hosts "$@"
+            ;;
+        port-forward|pf)
+            cmd_port_forward "$@"
+            ;;
+        test)
+            cmd_test "$@"
+            ;;
+        validate)
+            cmd_validate "$@"
+            ;;
+        upgrade)
+            cmd_upgrade "$@"
+            ;;
+        version|--version|-v)
+            cmd_version "$@"
+            ;;
+        help|--help|-h|"")
+            show_help
+            ;;
+        *)
+            print_error "Unknown command: $command"
+            echo ""
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
