@@ -96,7 +96,8 @@ The `values.yaml` file includes:
 - **Service Mesh**: `connectInject.enabled: true` - Enables Consul Connect
 - **Monitoring**: `prometheus.enabled: true` - Integrates with Prometheus
 - **UI Ingress**: Configured for nginx ingress with `consul.local` hostname
-- **High Availability**: 3 server replicas with data persistence
+- **High Availability**: 3 server replicas distributed across all nodes
+- **Control-plane Scheduling**: Tolerations allow scheduling on control-plane for full cluster utilization
 
 ## Troubleshooting
 
