@@ -88,6 +88,43 @@ kubectl get secret consul-bootstrap-acl-token -n consul -o jsonpath='{.data.toke
 
 You should now have full access to the Consul UI with administrative privileges.
 
+## Accessing Prometheus
+
+Prometheus is installed as part of the Consul deployment for metrics collection. You can access it in several ways:
+
+### Option 1: Port Forward (Quick Access)
+
+```bash
+kubectl port-forward -n consul svc/prometheus-server 9090:80
+```
+
+Then access Prometheus at: <http://localhost:9090>
+
+### Option 2: Ingress Access (Permanent)
+
+First, apply the Prometheus ingress:
+
+```bash
+kubectl apply -f prometheus-ingress.yaml
+```
+
+Add to your `/etc/hosts` file:
+
+```text
+127.0.0.1 prometheus.local
+```
+
+Then access Prometheus at: <http://prometheus.local>
+
+### Prometheus Queries for Consul
+
+Try these sample queries in Prometheus:
+
+- `consul_up` - Check if Consul servers are up
+- `consul_raft_leader` - Current Raft leader status
+- `consul_serf_member_status` - Member status in the cluster
+- `consul_catalog_services` - Number of services in catalog
+
 ## Configuration Highlights
 
 The `values.yaml` file includes:

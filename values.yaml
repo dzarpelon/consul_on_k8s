@@ -33,6 +33,8 @@ connectInject:
 # Install Prometheus for metrics collection.
 prometheus:
   enabled: true
+  # Note: The Consul Helm chart installs a basic Prometheus demo instance
+  # For ingress access, use the separate prometheus-ingress.yaml file
 # Settings under "ui" configure the Consul UI.
 ui:
   service:
