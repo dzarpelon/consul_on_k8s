@@ -18,6 +18,7 @@ This creates:
 - **Prometheus monitoring** at `http://prometheus.local`
 - **ACL security** with auto-generated admin token
 - **Automatic hosts setup** for local access
+- **Consul CLI configuration** for direct cluster interaction
 - **Complete cleanup** with `./consul-lab cleanup`
 
 ## Quick Start
@@ -30,14 +31,19 @@ cd consul/k8s
 # 2. (Optional) Customize configuration
 vim config/values.yaml
 
-# 3. Deploy everything (includes automatic hosts setup)
+# 3. Deploy everything (includes automatic hosts setup + Consul CLI config)
 ./consul-lab deploy
 
 # 4. Access the UIs
 ./consul-lab ui         # Opens Consul UI
 ./consul-lab prometheus # Opens Prometheus UI
 
-# 5. Clean up when done
+# 5. Use Consul CLI directly
+source .consul-env      # Load Consul connection config
+consul members          # Show cluster members
+consul catalog services # List services
+
+# 6. Clean up when done
 ./consul-lab cleanup --auto
 ```
 
@@ -48,6 +54,7 @@ Ensure you have:
 - Kubernetes cluster (Docker Desktop, kind, etc.)
 - `kubectl` configured and working
 - `consul-k8s` CLI installed (`brew install hashicorp/tap/consul-k8s`)
+- `consul` CLI installed (`brew install consul`) - optional but recommended
 - nginx ingress controller running
 
 ## Configuration
@@ -91,6 +98,36 @@ After making changes, validate your configuration:
 ./consul-lab validate
 ```
 
+## Using Consul CLI
+
+After deployment, the lab automatically configures the Consul CLI for direct cluster interaction:
+
+```bash
+# Load Consul connection configuration
+source .consul-env
+
+# Now you can use Consul CLI directly
+consul members                    # Show cluster members
+consul catalog services           # List all services
+consul catalog nodes              # List all nodes
+consul info                       # Show cluster information
+consul kv put mykey myvalue       # Store key-value data
+consul kv get mykey               # Retrieve key-value data
+consul acl token list             # List ACL tokens (requires permissions)
+```
+
+The `.consul-env` file contains:
+
+- `CONSUL_HTTP_ADDR`: Points to `http://consul.local`
+- `CONSUL_HTTP_TOKEN`: Bootstrap ACL token
+- `CONSUL_DATACENTER`: Datacenter name (dc1)
+
+You can also reconfigure the Consul CLI anytime:
+
+```bash
+./consul-lab configure-consul
+```
+
 ## CLI Commands
 
 ```bash
@@ -101,6 +138,7 @@ After making changes, validate your configuration:
 ./consul-lab logs           # View Consul logs
 ./consul-lab token          # Get bootstrap ACL token
 ./consul-lab cleanup        # Remove everything
+./consul-lab configure-consul # Setup Consul CLI connection
 ./consul-lab port-forward ui # Port forward for development
 ```
 
@@ -136,10 +174,19 @@ vim config/values.yaml                 # Edit configuration
 ./consul-lab deploy                    # Deploy with new config + auto hosts setup
 
 # Development workflow
-./consul-lab deploy                    # Deploy cluster + setup hosts
+./consul-lab deploy                    # Deploy cluster + setup hosts + configure CLI
+source .consul-env                     # Load Consul CLI config
+consul members                         # Check cluster status
 ./consul-lab port-forward ui           # Access via localhost:8500
 ./consul-lab logs                      # Monitor logs
 ./consul-lab cleanup --auto            # Clean up
+
+# Consul CLI workflow
+source .consul-env                     # Load configuration
+consul catalog services               # List services
+consul kv put test/key value          # Store data
+consul kv get test/key                # Retrieve data
+consul members                        # Show cluster members
 
 # Troubleshooting
 ./consul-lab validate                  # Check configuration
