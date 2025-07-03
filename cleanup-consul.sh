@@ -33,6 +33,39 @@ print_info() {
 }
 
 main() {
+    local auto_approve=false
+    local auto_hosts=false
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --auto|--yes|-y)
+                auto_approve=true
+                shift
+                ;;
+            --auto-hosts)
+                auto_hosts=true
+                shift
+                ;;
+            --help|-h)
+                echo "Usage: $0 [OPTIONS]"
+                echo ""
+                echo "Options:"
+                echo "  --auto, --yes, -y    Skip confirmation prompts"
+                echo "  --auto-hosts         Automatically remove /etc/hosts entries"
+                echo "  --help, -h           Show this help message"
+                echo ""
+                echo "This script completely removes the Consul deployment and all associated resources."
+                exit 0
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                echo "Use --help for usage information"
+                exit 1
+                ;;
+        esac
+    done
+    
     print_status "Consul Cleanup Script"
     echo
     
@@ -42,13 +75,20 @@ main() {
     echo "  • Persistent volumes and data"
     echo "  • ACL tokens and secrets"
     echo "  • Custom resources and configurations"
+    echo "  • Ingresses (including prometheus-ingress)"
+    echo "  • Consul namespace (if empty)"
+    echo "  • /etc/hosts entries (optional)"
     echo
     
-    read -p "Are you sure you want to proceed? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        print_status "Cleanup aborted"
-        exit 0
+    if [ "$auto_approve" = false ]; then
+        read -p "Are you sure you want to proceed? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_status "Cleanup aborted"
+            exit 0
+        fi
+    else
+        print_info "Auto-approve mode: proceeding with cleanup..."
     fi
     
     # Check if Consul is installed
@@ -67,6 +107,16 @@ main() {
         kubectl delete namespace consul --ignore-not-found=true
         print_success "Consul namespace deleted"
     fi
+    
+    # Clean up PVCs (consul-k8s preserves these by default)
+    print_status "Cleaning up persistent volume claims..."
+    kubectl delete pvc -n consul -l app=consul --ignore-not-found=true 2>/dev/null || true
+    kubectl delete pvc -n consul --all --ignore-not-found=true 2>/dev/null || true
+    
+    # Clean up separate ingresses (like prometheus-ingress.yaml)
+    print_status "Cleaning up ingresses..."
+    kubectl delete ingress -n consul prometheus-ingress --ignore-not-found=true 2>/dev/null || true
+    kubectl delete ingress -n consul --all --ignore-not-found=true 2>/dev/null || true
     
     # Clean up any remaining resources
     print_status "Cleaning up remaining resources..."
@@ -110,15 +160,34 @@ main() {
     kubectl delete validatingwebhookconfiguration consul-connect-injector 2>/dev/null || true
     
     print_success "Resource cleanup completed"
+    
+    # Clean up empty namespace if it still exists
+    print_status "Cleaning up namespace..."
+    if kubectl get namespace consul >/dev/null 2>&1; then
+        # Check if namespace is empty
+        resources=$(kubectl get all -n consul --no-headers 2>/dev/null | wc -l)
+        if [ "$resources" -eq 0 ]; then
+            kubectl delete namespace consul --ignore-not-found=true
+            print_success "Empty consul namespace removed"
+        else
+            print_warning "Consul namespace still contains resources, skipping deletion"
+        fi
+    fi
     echo
     
     # Optional: Clean up /etc/hosts entries
-    read -p "Do you want to remove consul.local and prometheus.local from /etc/hosts? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        print_status "Removing /etc/hosts entries..."
+    if [ "$auto_hosts" = true ]; then
+        print_status "Removing /etc/hosts entries (auto mode)..."
         sudo sed -i.bak '/consul\.local/d; /prometheus\.local/d' /etc/hosts 2>/dev/null || true
         print_success "/etc/hosts entries removed"
+    else
+        read -p "Do you want to remove consul.local and prometheus.local from /etc/hosts? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_status "Removing /etc/hosts entries..."
+            sudo sed -i.bak '/consul\.local/d; /prometheus\.local/d' /etc/hosts 2>/dev/null || true
+            print_success "/etc/hosts entries removed"
+        fi
     fi
     
     echo
