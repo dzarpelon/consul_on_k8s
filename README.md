@@ -211,3 +211,451 @@ consul-k8s uninstall
 # Or using Helm
 helm uninstall consul -n consul
 ```
+
+## Quick Start Scripts
+
+For automated deployment, use the provided scripts:
+
+### Setup /etc/hosts (One-time setup)
+
+```bash
+./setup-hosts.sh
+```
+
+This script adds the necessary hostname entries to your `/etc/hosts` file.
+
+### Deploy Consul (Automated)
+
+```bash
+./deploy-consul.sh
+```
+
+This script will:
+- Check all prerequisites
+- Deploy the 3-node Consul cluster
+- Configure ACLs and service mesh
+- Set up Prometheus monitoring
+- Output the bootstrap token for UI access
+
+### Cleanup (Remove everything)
+
+```bash
+./cleanup-consul.sh
+```
+
+This script completely removes the Consul deployment and all resources.
+
+## Manual Installation
+
+Alternatively, you can follow the manual steps below:
+
+### Step 1: Install consul-k8s CLI
+
+```bash
+# Install consul-k8s CLI
+brew install hashicorp/tap/consul-k8s
+
+# Verify installation
+consul-k8s version
+```
+
+### Step 2: Deploy Consul
+
+```bash
+# Clone this repository
+git clone <repository-url>
+cd consul/k8s
+
+# Deploy Consul using consul-k8s
+consul-k8s install -config-file=values.yaml
+
+# Monitor the deployment
+kubectl get pods -n consul
+```
+
+### Step 3: Configure Local Ingress Access
+
+Add the following entry to your `/etc/hosts` file:
+
+```text
+127.0.0.1 consul.local
+```
+
+### Step 4: Access the Consul UI
+
+1. Wait for all pods to be ready:
+
+   ```bash
+   kubectl wait --for=condition=ready pod -l app=consul -n consul --timeout=300s
+   ```
+
+2. Access the UI at: <http://consul.local>
+
+### Step 5: Bootstrap ACLs and Get Token
+
+When ACLs are enabled, Consul automatically generates a bootstrap token. Retrieve it:
+
+```bash
+# Get the bootstrap token
+kubectl get secret consul-bootstrap-acl-token -n consul -o jsonpath='{.data.token}' | base64 -d
+
+# Alternative: Get token and copy to clipboard (macOS)
+kubectl get secret consul-bootstrap-acl-token -n consul -o jsonpath='{.data.token}' | base64 -d | pbcopy
+```
+
+### Step 6: Login to Consul UI
+
+1. Navigate to <http://consul.local>
+2. Click "Log in with ACLs"
+3. Paste the bootstrap token from Step 5
+4. Click "Login"
+
+You should now have full access to the Consul UI with administrative privileges.
+
+## Accessing Prometheus
+
+Prometheus is installed as part of the Consul deployment for metrics collection. You can access it in several ways:
+
+### Option 1: Port Forward (Quick Access)
+
+```bash
+kubectl port-forward -n consul svc/prometheus-server 9090:80
+```
+
+Then access Prometheus at: <http://localhost:9090>
+
+### Option 2: Ingress Access (Permanent)
+
+First, apply the Prometheus ingress:
+
+```bash
+kubectl apply -f prometheus-ingress.yaml
+```
+
+Add to your `/etc/hosts` file:
+
+```text
+127.0.0.1 prometheus.local
+```
+
+Then access Prometheus at: <http://prometheus.local>
+
+### Prometheus Queries for Consul
+
+Try these sample queries in Prometheus:
+
+- `consul_up` - Check if Consul servers are up
+- `consul_raft_leader` - Current Raft leader status
+- `consul_serf_member_status` - Member status in the cluster
+- `consul_catalog_services` - Number of services in catalog
+
+## Configuration Highlights
+
+The `values.yaml` file includes:
+
+- **ACLs**: `global.acls.manageSystemACLs: true` - Enables ACLs for security
+- **Service Mesh**: `connectInject.enabled: true` - Enables Consul Connect
+- **Monitoring**: `prometheus.enabled: true` - Integrates with Prometheus
+- **UI Ingress**: Configured for nginx ingress with `consul.local` hostname
+- **High Availability**: 3 server replicas distributed across all nodes
+- **Control-plane Scheduling**: Tolerations allow scheduling on control-plane for full cluster utilization
+
+## Troubleshooting
+
+### UI Access Issues
+
+If you cannot access the UI:
+
+1. Check ingress controller is running:
+
+   ```bash
+   kubectl get pods -n ingress-nginx
+   ```
+
+2. Verify /etc/hosts entry exists:
+
+   ```bash
+   grep consul.local /etc/hosts
+   ```
+
+3. Check ingress resource:
+
+   ```bash
+   kubectl get ingress -n consul
+   ```
+
+### ACL Token Issues
+
+If you cannot retrieve the bootstrap token:
+
+1. Check if ACLs are enabled:
+
+   ```bash
+   kubectl get secret consul-bootstrap-acl-token -n consul
+   ```
+
+2. If the secret doesn't exist, ACLs may not be fully bootstrapped yet. Wait a few minutes and try again.
+
+### Pod Issues
+
+If pods are not starting:
+
+1. Check pod status:
+
+   ```bash
+   kubectl get pods -n consul
+   ```
+
+2. Check pod logs:
+
+   ```bash
+   kubectl logs -n consul -l app=consul
+   ```
+
+## Upgrading
+
+To upgrade the Consul deployment:
+
+```bash
+# Upgrade using consul-k8s
+consul-k8s upgrade -config-file=values.yaml
+
+# Or using Helm directly
+helm upgrade consul hashicorp/consul -f values.yaml -n consul
+```
+
+## Cleanup
+
+To remove the Consul deployment:
+
+```bash
+# Uninstall using consul-k8s
+consul-k8s uninstall
+
+# Or using Helm
+helm uninstall consul -n consul
+```
+
+## Quick Start Scripts
+
+For automated deployment, use the provided scripts:
+
+### Setup /etc/hosts (One-time setup)
+
+```bash
+./setup-hosts.sh
+```
+
+This script adds the necessary hostname entries to your `/etc/hosts` file.
+
+### Deploy Consul (Automated)
+
+```bash
+./deploy-consul.sh
+```
+
+This script will:
+- Check all prerequisites
+- Deploy the 3-node Consul cluster
+- Configure ACLs and service mesh
+- Set up Prometheus monitoring
+- Output the bootstrap token for UI access
+
+### Cleanup (Remove everything)
+
+```bash
+./cleanup-consul.sh
+```
+
+This script completely removes the Consul deployment and all resources.
+
+## Manual Installation
+
+Alternatively, you can follow the manual steps below:
+
+### Step 1: Install consul-k8s CLI
+
+```bash
+# Install consul-k8s CLI
+brew install hashicorp/tap/consul-k8s
+
+# Verify installation
+consul-k8s version
+```
+
+### Step 2: Deploy Consul
+
+```bash
+# Clone this repository
+git clone <repository-url>
+cd consul/k8s
+
+# Deploy Consul using consul-k8s
+consul-k8s install -config-file=values.yaml
+
+# Monitor the deployment
+kubectl get pods -n consul
+```
+
+### Step 3: Configure Local Ingress Access
+
+Add the following entry to your `/etc/hosts` file:
+
+```text
+127.0.0.1 consul.local
+```
+
+### Step 4: Access the Consul UI
+
+1. Wait for all pods to be ready:
+
+   ```bash
+   kubectl wait --for=condition=ready pod -l app=consul -n consul --timeout=300s
+   ```
+
+2. Access the UI at: <http://consul.local>
+
+### Step 5: Bootstrap ACLs and Get Token
+
+When ACLs are enabled, Consul automatically generates a bootstrap token. Retrieve it:
+
+```bash
+# Get the bootstrap token
+kubectl get secret consul-bootstrap-acl-token -n consul -o jsonpath='{.data.token}' | base64 -d
+
+# Alternative: Get token and copy to clipboard (macOS)
+kubectl get secret consul-bootstrap-acl-token -n consul -o jsonpath='{.data.token}' | base64 -d | pbcopy
+```
+
+### Step 6: Login to Consul UI
+
+1. Navigate to <http://consul.local>
+2. Click "Log in with ACLs"
+3. Paste the bootstrap token from Step 5
+4. Click "Login"
+
+You should now have full access to the Consul UI with administrative privileges.
+
+## Accessing Prometheus
+
+Prometheus is installed as part of the Consul deployment for metrics collection. You can access it in several ways:
+
+### Option 1: Port Forward (Quick Access)
+
+```bash
+kubectl port-forward -n consul svc/prometheus-server 9090:80
+```
+
+Then access Prometheus at: <http://localhost:9090>
+
+### Option 2: Ingress Access (Permanent)
+
+First, apply the Prometheus ingress:
+
+```bash
+kubectl apply -f prometheus-ingress.yaml
+```
+
+Add to your `/etc/hosts` file:
+
+```text
+127.0.0.1 prometheus.local
+```
+
+Then access Prometheus at: <http://prometheus.local>
+
+### Prometheus Queries for Consul
+
+Try these sample queries in Prometheus:
+
+- `consul_up` - Check if Consul servers are up
+- `consul_raft_leader` - Current Raft leader status
+- `consul_serf_member_status` - Member status in the cluster
+- `consul_catalog_services` - Number of services in catalog
+
+## Configuration Highlights
+
+The `values.yaml` file includes:
+
+- **ACLs**: `global.acls.manageSystemACLs: true` - Enables ACLs for security
+- **Service Mesh**: `connectInject.enabled: true` - Enables Consul Connect
+- **Monitoring**: `prometheus.enabled: true` - Integrates with Prometheus
+- **UI Ingress**: Configured for nginx ingress with `consul.local` hostname
+- **High Availability**: 3 server replicas distributed across all nodes
+- **Control-plane Scheduling**: Tolerations allow scheduling on control-plane for full cluster utilization
+
+## Troubleshooting
+
+### UI Access Issues
+
+If you cannot access the UI:
+
+1. Check ingress controller is running:
+
+   ```bash
+   kubectl get pods -n ingress-nginx
+   ```
+
+2. Verify /etc/hosts entry exists:
+
+   ```bash
+   grep consul.local /etc/hosts
+   ```
+
+3. Check ingress resource:
+
+   ```bash
+   kubectl get ingress -n consul
+   ```
+
+### ACL Token Issues
+
+If you cannot retrieve the bootstrap token:
+
+1. Check if ACLs are enabled:
+
+   ```bash
+   kubectl get secret consul-bootstrap-acl-token -n consul
+   ```
+
+2. If the secret doesn't exist, ACLs may not be fully bootstrapped yet. Wait a few minutes and try again.
+
+### Pod Issues
+
+If pods are not starting:
+
+1. Check pod status:
+
+   ```bash
+   kubectl get pods -n consul
+   ```
+
+2. Check pod logs:
+
+   ```bash
+   kubectl logs -n consul -l app=consul
+   ```
+
+## Upgrading
+
+To upgrade the Consul deployment:
+
+```bash
+# Upgrade using consul-k8s
+consul-k8s upgrade -config-file=values.yaml
+
+# Or using Helm directly
+helm upgrade consul hashicorp/consul -f values.yaml -n consul
+```
+
+## Cleanup
+
+To remove the Consul deployment:
+
+```bash
+# Uninstall using consul-k8s
+consul-k8s uninstall
+
+# Or using Helm
+helm uninstall consul -n consul
+```
