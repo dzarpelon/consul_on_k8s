@@ -1,0 +1,9 @@
+# Consul CLI Configuration
+# Source this file to configure your Consul CLI: source .consul-env
+
+export CONSUL_HTTP_ADDR="http://consul.local"
+export CONSUL_HTTP_TOKEN="78842c53-fb9d-13a7-636b-76cadf32a3ae"
+export CONSUL_DATACENTER="dc1"
+
+# Alternative localhost access (when port-forwarding)
+# export CONSUL_HTTP_ADDR="http://localhost:8500"

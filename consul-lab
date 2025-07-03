@@ -66,6 +66,7 @@ show_help() {
     echo "  ui              Open Consul UI in browser"
     echo "  prometheus      Open Prometheus UI in browser"
     echo "  setup-hosts     Add required entries to /etc/hosts"
+    echo "  configure-consul Set up Consul CLI connection parameters"
     echo "  port-forward    Port forward services to localhost"
     echo "  test            Run basic connectivity tests"
     echo "  validate        Validate configuration files"
@@ -82,7 +83,13 @@ show_help() {
     echo "  ./consul-lab deploy                    # Deploy Consul cluster"
     echo "  ./consul-lab cleanup --auto            # Cleanup without prompts"
     echo "  ./consul-lab status                    # Check deployment status"
+    echo "  ./consul-lab configure-consul          # Setup Consul CLI connection"
     echo "  ./consul-lab port-forward ui           # Port forward Consul UI"
+    echo ""
+    echo "After deployment, use Consul CLI directly:"
+    echo "  source .consul-env                     # Load Consul connection config"
+    echo "  consul members                         # Show cluster members"
+    echo "  consul catalog services                # List services"
     echo ""
 }
 
@@ -113,6 +120,12 @@ check_deps() {
             esac
         done
         exit 1
+    fi
+    
+    # Check optional Consul CLI
+    if ! command -v consul >/dev/null 2>&1; then
+        print_warning "Consul CLI not found. Install with: brew install consul"
+        print_info "Consul CLI enables direct cluster interaction after deployment"
     fi
     
     # Check Kubernetes connection
@@ -151,6 +164,10 @@ cmd_deploy() {
         else
             "$SCRIPTS_DIR/setup-hosts.sh"
         fi
+        
+        echo ""
+        print_header "Configuring Consul CLI connection"
+        setup_consul_cli_config
     fi
 }
 
@@ -314,6 +331,71 @@ cmd_version() {
     echo "Dependencies:"
     kubectl version --client 2>/dev/null | head -n1 || echo "kubectl: not installed"
     consul-k8s version 2>/dev/null || echo "consul-k8s: not installed"
+    consul version 2>/dev/null | head -n1 || echo "consul: not installed"
+}
+
+# Setup Consul CLI configuration
+setup_consul_cli_config() {
+    local token
+    local config_file="$SCRIPT_DIR/.consul-env"
+    
+    print_status "Setting up Consul CLI configuration..."
+    
+    # Get bootstrap token
+    token=$(kubectl get secret consul-bootstrap-acl-token -n consul -o jsonpath='{.data.token}' 2>/dev/null | base64 -d) || {
+        print_warning "Could not retrieve bootstrap token"
+        return 1
+    }
+    
+    # Create environment file
+    cat > "$config_file" << EOF
+# Consul CLI Configuration
+# Source this file to configure your Consul CLI: source .consul-env
+
+export CONSUL_HTTP_ADDR="http://consul.local"
+export CONSUL_HTTP_TOKEN="$token"
+export CONSUL_DATACENTER="dc1"
+
+# Alternative localhost access (when port-forwarding)
+# export CONSUL_HTTP_ADDR="http://localhost:8500"
+EOF
+    
+    print_success "Consul CLI configuration created: $config_file"
+    
+    # Source the configuration in the current shell if possible
+    if [[ -n "$ZSH_VERSION" ]] || [[ -n "$BASH_VERSION" ]]; then
+        print_status "Loading Consul CLI configuration into current shell..."
+        source "$config_file"
+        
+        # Test the configuration within the script
+        if command -v consul >/dev/null 2>&1; then
+            print_info "Testing Consul CLI connection..."
+            if consul members >/dev/null 2>&1; then
+                print_success "Consul CLI is working correctly within deployment script!"
+            else
+                print_warning "Consul CLI configuration loaded but connection test failed"
+            fi
+        fi
+        
+        echo ""
+        print_header "🎯 Next Steps"
+        print_info "To use Consul CLI in your terminal, run:"
+        echo "  source .consul-env"
+        echo ""
+        print_info "Then you can use commands like:"
+        echo "  consul members"
+        echo "  consul catalog services"
+        echo "  consul info"
+    else
+        print_info "To use the Consul CLI directly, run: source .consul-env"
+        print_info "Then you can use: consul members, consul catalog services, etc."
+    fi
+}
+
+# Configure Consul CLI command
+cmd_configure_consul() {
+    print_header "Configuring Consul CLI"
+    setup_consul_cli_config
 }
 
 # Main function
@@ -345,6 +427,9 @@ main() {
             ;;
         setup-hosts)
             cmd_setup_hosts "$@"
+            ;;
+        configure-consul)
+            cmd_configure_consul "$@"
             ;;
         port-forward|pf)
             cmd_port_forward "$@"
