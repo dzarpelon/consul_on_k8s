@@ -16,8 +16,13 @@ global:
 server:
   # replicas sets the number of Consul servers to run.
   # In prod, this should be 3 or 5.
-  # For testing, 1 is enough unless you are testing a DC voting scenario.
-  replicas: 1
+  # Using 3 replicas for high availability and fault tolerance.
+  replicas: 3
+  # Allow running on control-plane nodes for lab environment
+  tolerations: |
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
 # Settings under "controller" configure the Consul controller that manages custom resources.
 controller:
   enabled: true
