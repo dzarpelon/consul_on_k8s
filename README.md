@@ -17,6 +17,7 @@ This creates:
 - **Web UI** accessible at `http://consul.local`
 - **Prometheus monitoring** at `http://prometheus.local`
 - **ACL security** with auto-generated admin token
+- **Automatic hosts setup** for local access
 - **Complete cleanup** with `./consul-lab cleanup`
 
 ## Quick Start
@@ -29,17 +30,14 @@ cd consul/k8s
 # 2. (Optional) Customize configuration
 vim config/values.yaml
 
-# 3. Deploy everything
+# 3. Deploy everything (includes automatic hosts setup)
 ./consul-lab deploy
 
-# 4. Set up local access
-./consul-lab setup-hosts
-
-# 5. Access the UIs
+# 4. Access the UIs
 ./consul-lab ui         # Opens Consul UI
 ./consul-lab prometheus # Opens Prometheus UI
 
-# 6. Clean up when done
+# 5. Clean up when done
 ./consul-lab cleanup --auto
 ```
 
@@ -128,17 +126,17 @@ consul-lab/
 ```bash
 # Basic usage
 ./consul-lab validate                  # Check configuration first
-./consul-lab deploy                    # Deploy with interactive prompts
+./consul-lab deploy                    # Deploy with interactive prompts + auto hosts setup
 ./consul-lab cleanup --auto            # Cleanup without prompts
 ./consul-lab status                    # Check what's running
 
 # Configuration workflow
 vim config/values.yaml                 # Edit configuration
 ./consul-lab validate                  # Validate changes
-./consul-lab deploy                    # Deploy with new config
+./consul-lab deploy                    # Deploy with new config + auto hosts setup
 
 # Development workflow
-./consul-lab deploy                    # Deploy cluster
+./consul-lab deploy                    # Deploy cluster + setup hosts
 ./consul-lab port-forward ui           # Access via localhost:8500
 ./consul-lab logs                      # Monitor logs
 ./consul-lab cleanup --auto            # Clean up

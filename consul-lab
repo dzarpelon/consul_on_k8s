@@ -139,6 +139,19 @@ cmd_deploy() {
     
     cd "$CONFIG_DIR"
     "$SCRIPTS_DIR/deploy-consul.sh"
+    
+    # Check if deployment was successful before setting up hosts
+    if [ $? -eq 0 ]; then
+        echo ""
+        print_header "Setting up /etc/hosts for local access"
+        
+        if [ ! -f "$SCRIPTS_DIR/setup-hosts.sh" ]; then
+            print_warning "Setup hosts script not found: $SCRIPTS_DIR/setup-hosts.sh"
+            print_warning "You can manually set up hosts later with: ./consul-lab setup-hosts"
+        else
+            "$SCRIPTS_DIR/setup-hosts.sh"
+        fi
+    fi
 }
 
 # Cleanup command
